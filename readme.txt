@@ -4,3 +4,6 @@ if having problems with:
 
 -add:
  "/opt/ros/humble/include/**" to include path
+
+
+ Make sure to replace "/tmp/carnary_daemon_socket" with the actual path to the socket used by the CARnary daemon

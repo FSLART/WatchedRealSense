@@ -1,11 +1,16 @@
 #include "rclcpp/rclcpp.hpp"
 #include "std_msgs/msg/string.hpp"
-#include <iostream>
+#include <sys/socket.h>
+#include <sys/un.h>  // Include for AF_UNIX
 #include <unistd.h>
+#include <iostream>
+#include <cstring>
+#include <cerrno>
+
 
 class MyNode : public rclcpp::Node {
 public:
-    MyNode() : Node("my_node") {
+    MyNode() : Node("my_node"), sockfd_(-1) {
         // Initialize ROS2 publisher
         heartbeat_publisher_ = create_publisher<std_msgs::msg::String>("carnary_heartbeat", 10);
 
@@ -14,8 +19,7 @@ public:
             send_heartbeat();
         });
 
-        // Perform CARnary-specific initialization here.
-
+        // Establish communication with the CARnary daemon and perform a handshake.
         if (establishCommunicationWithDaemon() && performHandshake()) {
             RCLCPP_INFO(get_logger(), "Connected to CARnary daemon and performed handshake.");
         } else {
@@ -31,8 +35,9 @@ public:
             return false;
         }
 
-        sockaddr_un server_addr{};
+        struct sockaddr_un server_addr{};
         server_addr.sun_family = AF_UNIX;
+        //Make sure to replace "/tmp/carnary_daemon_socket" with the actual path to the socket used by the CARnary daemon
         strncpy(server_addr.sun_path, "/tmp/carnary_daemon_socket", sizeof(server_addr.sun_path) - 1);
 
         // Connect to the CARnary daemon.
@@ -42,21 +47,19 @@ public:
             return false;
         }
 
-           return true;
+        return true;
     }
 
-
-     bool performHandshake() {
+    bool performHandshake() {
         // Implement the handshake protocol with the CARnary daemon.
 
-
-        // Example: Send a handshake message.
         std::string handshake_message = "Hello CARnary!";
         ssize_t bytes_sent = send(sockfd_, handshake_message.c_str(), handshake_message.size(), 0);
         if (bytes_sent == -1) {
             RCLCPP_ERROR(get_logger(), "Error sending handshake message: %s", strerror(errno));
             return false;
         }
+
         return true;
     }
 
@@ -69,6 +72,7 @@ public:
 private:
     rclcpp::Publisher<std_msgs::msg::String>::SharedPtr heartbeat_publisher_;
     rclcpp::TimerBase::SharedPtr timer_;
+    int sockfd_;
 };
 
 int main(int argc, char **argv) {
@@ -77,5 +81,3 @@ int main(int argc, char **argv) {
     rclcpp::shutdown();
     return 0;
 }
-
-
