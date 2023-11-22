@@ -6,4 +6,7 @@ if having problems with:
  "/opt/ros/humble/include/**" to include path
 
 
- Make sure to replace "/tmp/carnary_daemon_socket" with the actual path to the socket used by the CARnary daemon
+"/usr/include/librealsense2",
+"~/CARnary_server/Carnary_lib/CARnary_lib/include" #path to the lib
+
+

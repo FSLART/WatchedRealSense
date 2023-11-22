@@ -2,6 +2,9 @@
 <?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
 <package format="3">
   <name>my_package</name>
+  <depend>rclcpp</depend>
+  <depend>sensor_msgs</depend>
+  <depend>std_msgs</depend>
   <version>0.0.0</version>
   <description>TODO: Package description</description>
   <maintainer email="username@todo.todo">username</maintainer>

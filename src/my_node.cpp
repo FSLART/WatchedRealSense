@@ -1,83 +1,81 @@
 #include "rclcpp/rclcpp.hpp"
+#include "sensor_msgs/msg/image.hpp"
 #include "std_msgs/msg/string.hpp"
-#include <sys/socket.h>
-#include <sys/un.h>  // Include for AF_UNIX
-#include <unistd.h>
-#include <iostream>
-#include <cstring>
-#include <cerrno>
+#include <librealsense2/rs.hpp>
+#include <carnary/CARnaryClient.h>
 
+namespace carnary::client {
+    // CARnaryClient definition...
+}
 
-class MyNode : public rclcpp::Node {
+class RealSenseNode : public rclcpp::Node {
 public:
-    MyNode() : Node("my_node"), sockfd_(-1) {
-        // Initialize ROS2 publisher
-        heartbeat_publisher_ = create_publisher<std_msgs::msg::String>("carnary_heartbeat", 10);
+    RealSenseNode() : Node("realsense_node"), carnary_client_() {
+        // Initialize RealSense pipeline
+        pipeline_.start();
 
-        // Create a timer to send heartbeats periodically
-        timer_ = create_wall_timer(std::chrono::seconds(5), [this]() {
-            send_heartbeat();
+        // Create ROS2 publishers
+        depth_pub_ = create_publisher<sensor_msgs::msg::Image>("depth", 10);
+        rgb_pub_ = create_publisher<sensor_msgs::msg::Image>("rgb", 10);
+
+        // Set up a timer for periodic heartbeats
+        handshake_timer_ = create_wall_timer(std::chrono::seconds(5), [this]() {
+            perform_handshake();
         });
 
-        // Establish communication with the CARnary daemon and perform a handshake.
-        if (establishCommunicationWithDaemon() && performHandshake()) {
-            RCLCPP_INFO(get_logger(), "Connected to CARnary daemon and performed handshake.");
-        } else {
-            RCLCPP_ERROR(get_logger(), "Failed to connect to CARnary daemon or perform handshake.");
+        // Connect and negotiate with CARnary daemon
+        try {
+            int daemon_fd = carnary_client_.tryConnect(3); // Attempt to connect 3 times
+            carnary_client_.negotiate(daemon_fd, "RealSenseNode", 5); // serviceName and minHeartbeatRate
+        } catch (const std::runtime_error& e) {
+            RCLCPP_ERROR(this->get_logger(), "CARnary Client Error: %s", e.what());
         }
     }
 
-    bool establishCommunicationWithDaemon() {
-        // Create a Unix socket to communicate with the CARnary daemon.
-        sockfd_ = socket(AF_UNIX, SOCK_STREAM, 0);
-        if (sockfd_ == -1) {
-            RCLCPP_ERROR(get_logger(), "Error creating socket: %s", strerror(errno));
-            return false;
-        }
+    void capture_and_publish() {
+        // Capture RealSense frames
+        rs2::frameset frames = pipeline_.wait_for_frames();
+        rs2::depth_frame depth_frame = frames.get_depth_frame();
+        rs2::video_frame color_frame = frames.get_color_frame();
 
-        struct sockaddr_un server_addr{};
-        server_addr.sun_family = AF_UNIX;
-        //Make sure to replace "/tmp/carnary_daemon_socket" with the actual path to the socket used by the CARnary daemon
-        strncpy(server_addr.sun_path, "/tmp/carnary_daemon_socket", sizeof(server_addr.sun_path) - 1);
+        // Convert RealSense frames to ROS2 messages
+        auto depth_msg = convert_to_ros_message(depth_frame);
+        auto rgb_msg = convert_to_ros_message(color_frame);
 
-        // Connect to the CARnary daemon.
-        if (connect(sockfd_, reinterpret_cast<struct sockaddr*>(&server_addr), sizeof(server_addr)) == -1) {
-            RCLCPP_ERROR(get_logger(), "Error connecting to CARnary daemon: %s", strerror(errno));
-            close(sockfd_);
-            return false;
-        }
-
-        return true;
+        // Publish RealSense data
+        depth_pub_->publish(depth_msg);
+        rgb_pub_->publish(rgb_msg);
     }
 
-    bool performHandshake() {
-        // Implement the handshake protocol with the CARnary daemon.
-
-        std::string handshake_message = "Hello CARnary!";
-        ssize_t bytes_sent = send(sockfd_, handshake_message.c_str(), handshake_message.size(), 0);
-        if (bytes_sent == -1) {
-            RCLCPP_ERROR(get_logger(), "Error sending handshake message: %s", strerror(errno));
-            return false;
+    void perform_handshake() {
+        try {
+            carnary_client_.ping(); // Send heartbeat to CARnary
+        } catch (const std::runtime_error& e) {
+            RCLCPP_ERROR(this->get_logger(), "Error pinging CARnary: %s", e.what());
         }
-
-        return true;
     }
 
-    void send_heartbeat() {
-        auto heartbeat_msg = std_msgs::msg::String();
-        heartbeat_msg.data = "Node is alive"; // Modify as needed
-        heartbeat_publisher_->publish(heartbeat_msg);
+    ~RealSenseNode() {
+        carnary_client_.cleanup(); // Cleanup CARnary client
     }
 
 private:
-    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr heartbeat_publisher_;
-    rclcpp::TimerBase::SharedPtr timer_;
-    int sockfd_;
+    rs2::pipeline pipeline_;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr depth_pub_;
+    rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr rgb_pub_;
+    rclcpp::TimerBase::SharedPtr handshake_timer_;
+    carnary::client::CARnaryClient carnary_client_;
+
+    // Method to convert RealSense frame to ROS2 message (implement as needed)
+    sensor_msgs::msg::Image convert_to_ros_message(const rs2::frame& frame) {
+        // Conversion logic...
+    }
 };
 
-int main(int argc, char **argv) {
+int main(int argc, char* argv[]) {
     rclcpp::init(argc, argv);
-    rclcpp::spin(std::make_shared<MyNode>());
+    auto node = std::make_shared<RealSenseNode>();
+    rclcpp::spin(node);
     rclcpp::shutdown();
     return 0;
 }
