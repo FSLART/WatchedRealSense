@@ -6,6 +6,8 @@ This is a ROS RealSense reading package with the team-developed [CARnary](https:
 - ROS2
 - sensor_msgs
 - RealSense SDK
+- OpenCV
+- ros humble vision opencv
 
 or
 
