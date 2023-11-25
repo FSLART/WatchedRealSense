@@ -9,27 +9,27 @@ endif()
 # Find dependencies
 find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rclcpp_components REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 
-# Uncomment if you're using std_msgs
- find_package(std_msgs REQUIRED)
+# Find RealSense library
+find_package(realsense2 REQUIRED)
 
 # Add executable
 add_executable(my_node src/my_node.cpp)
 
 # Add dependencies to the executable
-ament_target_dependencies(my_node rclcpp sensor_msgs)
-# Include std_msgs if you're using it
- ament_target_dependencies(my_node rclcpp std_msgs sensor_msgs)
+ament_target_dependencies(my_node rclcpp rclcpp_components sensor_msgs std_msgs)
 
 # Include directories for CARnary_lib
 # Replace with the actual path if different
 include_directories(~/CARnary_server/Carnary_lib/CARnary_lib)
 
-# Link against CARnary_lib
-# Replace with the actual path if different
+# Link against CARnary_lib and RealSense SDK
+# Replace with the actual path if different for CARnary_lib
 link_directories(~/CARnary_server/Carnary_lib/CARnary_lib/src)
-target_link_libraries(my_node CARnary_lib)
+target_link_libraries(my_node CARnary_lib ${realsense2_LIBRARY}) # Link RealSense library
 
 # Include directories
 target_include_directories(my_node PUBLIC
