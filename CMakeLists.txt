@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(watched_realsense)
+project(my_package)
 
 # Compiler options
 if(CMAKE_COMPILER_IS_GNUCXX OR CMAKE_CXX_COMPILER_ID MATCHES "Clang")
@@ -14,12 +14,19 @@ find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(OpenCV REQUIRED)
 find_package(cv_bridge REQUIRED)
+find_package(CARnary_lib REQUIRED)
+
+message("CARnary_lib found: ${CARnary_lib_FOUND}")
+message("CARnary_lib Libraries: ${CARnary_lib_LIBRARIES}")
+
+
+
 
 # Find RealSense library
 find_package(realsense2 REQUIRED)
 
 # Add executable
-add_executable(realsense_node src/realsense_node.cpp)
+add_executable(my_node src/my_node.cpp)
 
 # Add dependencies to the executable
 ament_target_dependencies(my_node rclcpp rclcpp_components sensor_msgs std_msgs cv_bridge)
@@ -37,15 +44,15 @@ link_directories(~/CARnary_server/Carnary_lib/CARnary_lib/src)
 target_link_libraries(my_node CARnary_lib ${realsense2_LIBRARY} ${OpenCV_LIBRARIES})
 
 # Include directories
-target_include_directories(realsense_node PUBLIC
+target_include_directories(my_node PUBLIC
   $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
   $<INSTALL_INTERFACE:include>)
 
 # Set C++ standard
-target_compile_features(realsense_node PUBLIC c_std_99 cxx_std_17)
+target_compile_features(my_node PUBLIC c_std_99 cxx_std_17)
 
 # Install the executable
-install(TARGETS realsense_node
+install(TARGETS my_node
   DESTINATION lib/${PROJECT_NAME})
 
 # Testing

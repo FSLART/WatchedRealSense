@@ -7,12 +7,13 @@
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
+
 #include <iostream>
 #include <string>
 #include <thread>
 
 // Assuming CARnaryClient is defined in the carnary namespace
-using namespace carnary;
+using namespace carnary::client;
 
 #define MAX_CONNECT_TRIES 3
 #define SERVICE_NAME "RealSenseNode"
@@ -70,23 +71,34 @@ public:
 
     void capture_and_publish() {
         try {
-            // Capture RealSense frames
-            rs2::frameset frames = pipeline_.wait_for_frames();
-            rs2::depth_frame depth_frame = frames.get_depth_frame();
-            rs2::video_frame color_frame = frames.get_color_frame();
+            // Attempt to capture frames from the RealSense camera
+            rs2::frameset frames;
+            if (pipeline_.poll_for_frames(&frames)) {
+                rs2::depth_frame depth_frame = frames.get_depth_frame();
+                rs2::video_frame color_frame = frames.get_color_frame();
 
-            // Convert RealSense frames to ROS2 messages
-            auto depth_msg = convert_to_ros_message(depth_frame);
-            auto rgb_msg = convert_to_ros_message(color_frame);
+                // Check if frames are valid
+                if (!depth_frame || !color_frame) {
+                    RCLCPP_WARN(this->get_logger(), "Invalid frame captured");
+                    return; // Skip this iteration if frames are invalid
+                }
 
-            // Publish RealSense data
-            depth_pub_->publish(depth_msg);
-            rgb_pub_->publish(rgb_msg);
-        } catch (const std::exception& e) {
+                // Convert RealSense frames to ROS2 messages
+                auto depth_msg = convert_to_ros_message(depth_frame);
+                auto rgb_msg = convert_to_ros_message(color_frame);
+
+                // Publish RealSense data
+                depth_pub_->publish(depth_msg);
+                rgb_pub_->publish(rgb_msg);
+            } else {
+                RCLCPP_WARN(this->get_logger(), "No frames captured");
+            }
+        } catch (const rs2::error &e) {
+            RCLCPP_ERROR(this->get_logger(), "RealSense error in capture_and_publish: %s", e.what());
+        } catch (const std::exception &e) {
             RCLCPP_ERROR(this->get_logger(), "Error in capture_and_publish: %s", e.what());
         }
     }
-
     ~RealSenseNode() {
         pipeline_.stop(); // Stop the RealSense pipeline
         if (heartbeat_thread_.joinable()) {
