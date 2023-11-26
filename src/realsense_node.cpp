@@ -3,27 +3,34 @@
 #include "std_msgs/msg/string.hpp"
 #include <librealsense2/rs.hpp>
 #include <carnary/CARnaryClient.h>
-
 #include <sensor_msgs/image_encodings.hpp>
 #include <opencv2/opencv.hpp>
 #include <cv_bridge/cv_bridge.h>
 
+#include <iostream>
+#include <string>
+#include <thread>
 
-namespace carnary::client {
-    // CARnaryClient definition...
-}
+// Assuming CARnaryClient is defined in the carnary namespace
+using namespace carnary;
+
+#define MAX_CONNECT_TRIES 3
+#define SERVICE_NAME "RealSenseNode"
+// Define the minimum and actual heartbeat rates
+#define MIN_HEARTBEAT_RATE 1
+#define ACTUAL_HEARTBEAT_RATE 1
 
 class RealSenseNode : public rclcpp::Node {
 public:
-    RealSenseNode() : Node("realsense_node"), carnary_client_() {
-        // Declare and get parameters
+    RealSenseNode() : Node("realsense_node") {
+        // Initialize RealSense pipeline
+        pipeline_.start();
+
+        // Declare and get parameters for topics
         this->declare_parameter<std::string>("depth_topic", "depth");
         this->declare_parameter<std::string>("rgb_topic", "rgb");
         std::string depth_topic = this->get_parameter("depth_topic").as_string();
         std::string rgb_topic = this->get_parameter("rgb_topic").as_string();
-
-        // Initialize RealSense pipeline
-        pipeline_.start();
 
         // Create ROS2 publishers
         depth_pub_ = create_publisher<sensor_msgs::msg::Image>(depth_topic, 10);
@@ -34,17 +41,30 @@ public:
             capture_and_publish();
         });
 
-        // Timer for periodic heartbeats
-        handshake_timer_ = create_wall_timer(std::chrono::seconds(5), [this]() {
-            perform_handshake();
-        });
+        // Initialize connection to CARnary server
+        initialize_carnary_connection();
+    }
 
-        // Connect and negotiate with CARnary daemon
+    void initialize_carnary_connection() {
         try {
-            int daemon_fd = carnary_client_.tryConnect(3); // Attempt to connect 3 times
-            carnary_client_.negotiate(daemon_fd, "RealSenseNode", 5); // serviceName and minHeartbeatRate
+            // Connect to the CARnary server
+            daemon_fd_ = carnary_client_.tryConnect(MAX_CONNECT_TRIES);
+
+            // Negotiate with the CARnary server
+            watcher_fd_ = carnary_client_.negotiate(daemon_fd_, SERVICE_NAME, MIN_HEARTBEAT_RATE);
+
+            // Start heartbeat sending in a separate thread
+            heartbeat_thread_ = std::thread(&RealSenseNode::send_heartbeat, this);
         } catch (const std::runtime_error& e) {
-            RCLCPP_ERROR(this->get_logger(), "CARnary Client Error: %s", e.what());
+            RCLCPP_ERROR(this->get_logger(), "CARnary Server Error: %s", e.what());
+        }
+    }
+
+    void send_heartbeat() {
+        while (rclcpp::ok()) {
+            std::cout << "ping" << std::endl;
+            carnary_client_.ping();
+            std::this_thread::sleep_for(std::chrono::milliseconds(1000 / ACTUAL_HEARTBEAT_RATE));
         }
     }
 
@@ -67,18 +87,11 @@ public:
         }
     }
 
-    void perform_handshake() {
-        try {
-            carnary_client_.ping(); // Send heartbeat to CARnary
-        } catch (const std::runtime_error& e) {
-            RCLCPP_ERROR(this->get_logger(), "Error pinging CARnary: %s", e.what());
-            // Implement reconnection logic here
-        }
-    }
-
     ~RealSenseNode() {
         pipeline_.stop(); // Stop the RealSense pipeline
-        carnary_client_.cleanup(); // Cleanup CARnary client
+        if (heartbeat_thread_.joinable()) {
+            heartbeat_thread_.join();
+        }
     }
 
 private:
@@ -86,8 +99,10 @@ private:
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr depth_pub_;
     rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr rgb_pub_;
     rclcpp::TimerBase::SharedPtr capture_timer_;
-    rclcpp::TimerBase::SharedPtr handshake_timer_;
-    carnary::client::CARnaryClient carnary_client_;
+    CARnaryClient carnary_client_;
+    int daemon_fd_ = -1;
+    int watcher_fd_ = -1;
+    std::thread heartbeat_thread_;
 
     // Method to convert RealSense frame to ROS2 message (implement as needed)
     sensor_msgs::msg::Image convert_to_ros_message(const rs2::frame& frame) {
@@ -136,4 +151,3 @@ int main(int argc, char* argv[]) {
     rclcpp::shutdown();
     return 0;
 }
-
