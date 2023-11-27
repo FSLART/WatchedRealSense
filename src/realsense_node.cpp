@@ -10,7 +10,15 @@ namespace carnary::client {
 
 class RealSenseNode : public rclcpp::Node {
 public:
-    RealSenseNode() : Node("realsense_node"), carnary_client_() {
+    RealSenseNode() : Node("realsense_node") {
+
+        try {
+            this->carnary_client_ = carnary::client::CARnaryClient();
+        } catch(std::runtime_error& e) {
+            RCLCPP_ERROR(this->get_logger(), "CARnary Client Error: %s", e.what());
+            return;
+        }
+
         // Initialize RealSense pipeline
         pipeline_.start();
 
