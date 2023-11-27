@@ -72,7 +72,6 @@ public:
             // Handle other exceptions
         }
     }
-    }
 
     void initialize_carnary_connection() {
         try {
