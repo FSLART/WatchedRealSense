@@ -19,7 +19,8 @@ If you aren't actively developing this package, using the Docker image is recomm
 
 ### Bare metal
 - Install the dependencies.
-- TODO...
+- root worskpace run: `colcon build`.
+- run package: `ros2 run my_package my_node`
 
 ### Docker
 
