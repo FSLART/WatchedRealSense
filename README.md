@@ -7,6 +7,7 @@ This is a ROS RealSense reading package with the team-developed [CARnary](https:
 - sensor_msgs
 - RealSense SDK
 - [CARnary_lib](https://github.com/FSLART/CARnary_lib.git)
+- OpenCV
 
 or
 
