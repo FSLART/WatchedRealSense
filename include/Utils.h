@@ -4,6 +4,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include <sensor_msgs/msg/image.hpp>
 #include <librealsense2/rs.hpp>
+#include <opencv4/opencv2/opencv.hpp>
 
 class Utils {
 
@@ -24,4 +25,6 @@ class Utils {
         * 
         */
         static sensor_msgs::msg::Image::SharedPtr cvMatToRosMsg(cv::Mat image, std::string encoding);
-}
+};
+
+#endif // UTILS_H_
