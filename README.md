@@ -20,7 +20,7 @@ If you aren't actively developing this package, using the Docker image is recomm
 ### Bare metal
 - Install the dependencies.
 - root worskpace run: `colcon build`.
-- run package: `ros2 run my_package my_node`
+- run package: `ros2 run WatchedRealSense my_node`
 
 ### Docker
 
