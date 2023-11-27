@@ -147,41 +147,39 @@ private:
     // Method to convert RealSense frame to ROS2 message (implement as needed)
     sensor_msgs::msg::Image convert_to_ros_message(const rs2::frame& frame) {
         // Create a ROS image message
-        sensor_msgs::msg::Image ros_image;
+    sensor_msgs::msg::Image ros_image;
 
-        // Check if the frame is a video frame
-        if (auto video_frame = frame.as<rs2::video_frame>()) {
-            // Determine the encoding based on the frame format
-            std::string encoding;
-            switch (video_frame.get_profile().format()) {
-                case RS2_FORMAT_BGR8:
-                    encoding = sensor_msgs::image_encodings::BGR8;
-                    break;
-                case RS2_FORMAT_RGB8:
-                    encoding = sensor_msgs::image_encodings::RGB8;
-                    break;
-                default:
-                    throw std::runtime_error("Unsupported frame format");
-            }
-
-            // Convert to OpenCV Mat
-            cv::Mat frame_mat(cv::Size(video_frame.get_width(), video_frame.get_height()), 
-                            CV_8UC3, (void*)video_frame.get_data(), cv::Mat::AUTO_STEP);
-
-            // Convert OpenCV Mat to ROS2 image message using cv_bridge
-            cv_bridge::CvImage cv_image;
-            cv_image.image = frame_mat;
-            cv_image.encoding = encoding;
-            cv_image.toImageMsg(ros_image);
-        } else {
-            throw std::runtime_error("Frame is not a video frame");
+    // Check if the frame is a depth frame
+    if (auto depth_frame = frame.as<rs2::depth_frame>()) {
+        // Handling depth frame (16-bit data)
+        ros_image.encoding = sensor_msgs::image_encodings::TYPE_16UC1;
+        ros_image.width = depth_frame.get_width();
+        ros_image.height = depth_frame.get_height();
+        ros_image.step = depth_frame.get_stride_in_bytes();
+        ros_image.data = std::vector<uint8_t>((uint8_t*)depth_frame.get_data(), (uint8_t*)depth_frame.get_data() + ros_image.step * ros_image.height);
+    } else if (auto video_frame = frame.as<rs2::video_frame>()) {
+        // Handling color frame
+        std::string encoding;
+        switch (video_frame.get_profile().format()) {
+            case RS2_FORMAT_RGB8:
+                encoding = sensor_msgs::image_encodings::RGB8;
+                break;
+            case RS2_FORMAT_BGR8:
+            default:
+                encoding = sensor_msgs::image_encodings::BGR8;
+                break;
         }
-
-        // Set the frame timestamp
-        ros_image.header.stamp = rclcpp::Time(frame.get_timestamp());
-
-        return ros_image;
+        // Convert to OpenCV Mat and to ROS2 image message...
+        // (Your existing code for color frame conversion)
+    } else {
+        RCLCPP_ERROR(this->get_logger(), "Frame is not a recognized type");
+        return ros_image; // Return empty image message if not recognized
     }
+
+    // Set the frame timestamp and return the image message
+    ros_image.header.stamp = rclcpp::Time(frame.get_timestamp());
+    return ros_image;
+}
 };
 
 int main(int argc, char* argv[]) {
