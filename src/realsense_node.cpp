@@ -12,6 +12,7 @@ class RealSenseNode : public rclcpp::Node {
 public:
     RealSenseNode() : Node("realsense_node") {
 
+        // initialize CARnary client
         try {
             this->carnary_client_ = carnary::client::CARnaryClient();
         } catch(std::runtime_error& e) {
@@ -25,11 +26,6 @@ public:
         // Create ROS2 publishers
         depth_pub_ = create_publisher<sensor_msgs::msg::Image>("depth", 10);
         rgb_pub_ = create_publisher<sensor_msgs::msg::Image>("rgb", 10);
-
-        // Set up a timer for periodic heartbeats
-        handshake_timer_ = create_wall_timer(std::chrono::seconds(5), [this]() {
-            perform_handshake();
-        });
 
         // Connect and negotiate with CARnary daemon
         try {
@@ -49,6 +45,8 @@ public:
         // Convert RealSense frames to ROS2 messages
         auto depth_msg = convert_to_ros_message(depth_frame);
         auto rgb_msg = convert_to_ros_message(color_frame);
+
+        carnary_client_.ping(); // Send heartbeat to CARnary
 
         // Publish RealSense data
         depth_pub_->publish(depth_msg);
